@@ -152,6 +152,7 @@
   .lt.mini{padding:0;margin:2px 0 8px;gap:6px}
   .lt.mini button,.lt.mini select{min-height:34px;font-size:13px;padding:0 8px;flex:1 1 auto}
   .lt button b,.lt button i{font-size:15px}
+  .nbadge{font-weight:700;color:var(--navy);min-width:28px;text-align:right}
   .hint{font-size:14px;color:var(--muted);padding:0 16px;margin:12px 0 8px}
   .sizebar{display:flex;gap:6px;align-items:center;padding:0 16px;margin:0 0 10px;flex-wrap:wrap}
   .sizebar span{font-size:14px;color:var(--muted);flex:1 1 100%}
@@ -201,7 +202,7 @@
     <div class="brandrow">
       <div class="logobox"><img id="logoImg" alt="Maurel &amp; Prom" width="88" height="54"></div>
       <div>
-        <div class="site">EZANGA — Maintenance</div>
+        <div class="site">EZANGA — Maintenance · <span id="appVer"></span></div>
         <div class="doc">Rapport d'intervention</div>
       </div>
     </div>
@@ -259,6 +260,7 @@
         <button type="button" id="opsSw" role="switch" aria-checked="true" aria-label="Inclure les opérations réalisées"></button>
       </div>
       <div id="opsBox">
+        <label class="f" style="margin-bottom:10px"><span>Numérotation des opérations</span><select data-k="opsNum"><option value="">Puces (•)</option><option value="d.">1. 2. 3.</option><option value="d)">1) 2) 3)</option><option value="l)">a) b) c)</option><option value="r.">i. ii. iii.</option></select></label>
         <div id="ops"></div>
         <div class="chips" id="opsChips"></div>
         <button class="add" type="button" id="addOp">+ Ajouter une opération</button>
@@ -286,6 +288,7 @@
 
     <section class="sec">
       <h2><span class="n">3</span>Actions de remise en état</h2>
+      <label class="f" style="margin-bottom:6px"><span>Numérotation des actions</span><select data-k="actsNum"><option value="">Aucune (cases seules)</option><option value="d.">1. 2. 3.</option><option value="d)">1) 2) 3)</option><option value="l)">a) b) c)</option><option value="r.">i. ii. iii.</option></select></label>
       <div id="acts"></div>
       <div class="chips" id="actsChips"></div>
       <button class="add" type="button" id="addAct">+ Ajouter une action</button>
@@ -356,6 +359,7 @@
     <div class="sub" style="padding:0 16px;margin-top:18px">Carnet : équipements et intervenants</div>
     <p class="hint">Ces noms sont proposés automatiquement quand tu remplis un rapport. Appuie sur × pour retirer une entrée.</p>
     <div id="carnetList"></div>
+    <p class="hint" id="verInfo" style="text-align:center;margin-top:22px"></p>
     <input type="file" id="restoreFile" accept=".json,application/json" hidden>
   </main>
 </div>
@@ -527,6 +531,7 @@
     type:"Reconditionnement",
     intervs:[{n:"MBOULA Darlis",m:"Mécanique"}],
     permis:"", consE:"", consM:"",
+    opsNum:"", actsNum:"",
     opsOn:true, ops:[{t:"",m:"",photos:[]}],
     testOn:false, tests:[],
     tr:{},
@@ -715,22 +720,30 @@
       box.append(row);
     });
   }
+  let opsBadges = [], actsBadges = [];
+  function refreshBadges(){
+    let n = 0;
+    D.ops.forEach((o,i)=>{ const b = opsBadges[i]; if(!b) return; const on = D.opsNum && (o.t.trim() || o.photos.length); if(on) n++; b.hidden = !on; b.textContent = on ? markFor(D.opsNum,n) : ""; });
+    n = 0;
+    D.acts.forEach((a,i)=>{ const b = actsBadges[i]; if(!b) return; const on = D.actsNum && (a.t.trim() || a.photos.length); if(on) n++; b.hidden = !on; b.textContent = on ? markFor(D.actsNum,n) : ""; });
+  }
   function renderOps(){
-    const box = $("#ops"); box.innerHTML="";
+    const box = $("#ops"); box.innerHTML=""; opsBadges = [];
     D.ops.forEach((o,i)=>{
       const card = document.createElement("div"); card.className="op";
       const row = document.createElement("div"); row.className="row";
       const inp = document.createElement("textarea"); inp.rows=1; inp.className="mlt"; inp.value=o.t; inp.placeholder="Opération réalisée (1re ligne = intitulé, lignes suivantes = détails)"; inp.setAttribute("aria-label","Opération "+(i+1));
-      inp.addEventListener("input",()=>{ o.t=inp.value; autoGrow(inp); changed(); });
+      inp.addEventListener("input",()=>{ o.t=inp.value; autoGrow(inp); refreshBadges(); changed(); });
+      const nb = document.createElement("span"); nb.className="nbadge"; nb.hidden=true; opsBadges.push(nb);
       const x = document.createElement("button"); x.type="button"; x.className="x"; x.textContent="×"; x.setAttribute("aria-label","Supprimer l'opération");
       x.addEventListener("click",()=>{ D.ops.splice(i,1); if(!D.ops.length) D.ops.push({t:"",m:"",photos:[]}); rerenderPhotos(); changed(); });
-      row.append(inp,x);
+      row.append(nb,inp,x);
       const mt = document.createElement("input"); mt.type="text"; mt.className="mt2"; mt.value=o.m; mt.placeholder="Corps de métier (facultatif)"; mt.setAttribute("list","dl-m"); mt.setAttribute("aria-label","Corps de métier de l'opération "+(i+1));
       mt.addEventListener("input",()=>{ o.m=mt.value; changed(); });
       card.append(row);
       attachListTools(inp,{mini:true,place:b=>card.append(b)});
       card.append(mt,photoBlock(o,"opération "+(i+1))); box.append(card);
-      setTimeout(()=>autoGrow(inp),0);
+      setTimeout(()=>autoGrow(inp),0); refreshBadges();
     });
   }
 
@@ -809,7 +822,7 @@
   function setSw(btn,on,box){ $(btn).setAttribute("aria-checked",on?"true":"false"); if(box) $(box).hidden=!on; }
 
   function renderActs(){
-    const box = $("#acts"); box.innerHTML="";
+    const box = $("#acts"); box.innerHTML=""; actsBadges = [];
     D.acts.forEach((a,i)=>{
       const w = document.createElement("div"); w.className="actw";
       const row = document.createElement("div"); row.className="check"+(a.done?" done":"");
@@ -817,15 +830,16 @@
       b.addEventListener("click",()=>{ a.done=!a.done; renderActs(); changed(); });
       const l = document.createElement("div"); l.className="lbl";
       const inp = document.createElement("textarea"); inp.rows=1; inp.className="mlt"; inp.value=a.t; inp.placeholder="Action de remise en état"; inp.setAttribute("aria-label","Action "+(i+1));
-      inp.addEventListener("input",()=>{ a.t=inp.value; autoGrow(inp); changed(); });
+      inp.addEventListener("input",()=>{ a.t=inp.value; autoGrow(inp); refreshBadges(); changed(); });
+      const nb = document.createElement("span"); nb.className="nbadge"; nb.hidden=true; actsBadges.push(nb);
       l.append(inp);
       attachListTools(inp,{mini:true,place:bb=>l.append(bb)});
       setTimeout(()=>autoGrow(inp),0);
       const x = document.createElement("button"); x.type="button"; x.className="x"; x.textContent="×"; x.setAttribute("aria-label","Supprimer l'action");
       x.addEventListener("click",()=>{ D.acts.splice(i,1); if(!D.acts.length) D.acts.push({t:"",done:false,photos:[]}); rerenderPhotos(); changed(); });
-      row.append(b,l,x);
+      row.append(b,nb,l,x);
       w.append(row,photoBlock(a,"action "+(i+1)));
-      box.append(w);
+      box.append(w); refreshBadges();
     });
   }
   function renderChips(){
@@ -938,7 +952,7 @@
     infoRows().forEach(([k,val])=>L.push(k+" : "+val));
     if(M.ops.length || M.tests.length || D.constat.trim()){
       L.push("",(++n)+". "+(M.ops.length?"Opérations réalisées":"Contrôles et constat"));
-      M.ops.forEach(o=>{ const it=splitItem(o.t); L.push("• "+plain(it.head||"—")+(o.m.trim()?" ("+o.m.trim()+")":"")); detailLines(it.rest).forEach(x=>L.push(x)); o.photos.forEach(p=>L.push("   ["+capOf(p,M.nums)+"]")); });
+      M.ops.forEach((o,oi)=>{ const it=splitItem(o.t); L.push((D.opsNum?markFor(D.opsNum,oi+1):"•")+" "+plain(it.head||"—")+(o.m.trim()?" ("+o.m.trim()+")":"")); detailLines(it.rest).forEach(x=>L.push(x)); o.photos.forEach(p=>L.push("   ["+capOf(p,M.nums)+"]")); });
       if(M.tests.length){ L.push("",TH_TEST.join("\t")); M.tests.forEach(r=>L.push(r.join("\t"))); }
       if(D.constat.trim()) L.push("","Constat : "+plain(D.constat.trim()));
     }
@@ -954,7 +968,7 @@
     }
     if(M.acts.length){
       L.push("",(++n)+". Actions de remise en état");
-      M.acts.forEach(a=>{ const it=splitItem(a.t); L.push((a.done?"☑ ":"☐ ")+(plain(it.head)||"—")); detailLines(it.rest).forEach(x=>L.push(x)); a.photos.forEach(p=>L.push("   ["+capOf(p,M.nums)+"]")); });
+      M.acts.forEach((a,ai)=>{ const it=splitItem(a.t); L.push((a.done?"☑ ":"☐ ")+(D.actsNum?markFor(D.actsNum,ai+1)+" ":"")+(plain(it.head)||"—")); detailLines(it.rest).forEach(x=>L.push(x)); a.photos.forEach(p=>L.push("   ["+capOf(p,M.nums)+"]")); });
     }
     if(M.parts.length){ L.push("",(++n)+". Pièces remplacées",TH_PART.join("\t")); M.parts.forEach(r=>L.push(r.join("\t"))); }
     L.push("",(++n)+". Conclusion",plain(D.conclusion.trim()||"—"),"");
@@ -989,7 +1003,7 @@
       infoRows().map(([k,val])=>'<tr><td width="38%" style="border:1px solid #C9D0D8;background:#EEF1F4;font-weight:bold">'+esc(k)+'</td><td style="border:1px solid #C9D0D8">'+esc(val)+'</td></tr>').join("")+'</table>');
     if(M.ops.length || M.tests.length || D.constat.trim()){
       h.push(H2(M.ops.length?"Opérations réalisées":"Contrôles et constat"));
-      M.ops.forEach(o=>{ const it=splitItem(o.t); h.push('<p style="margin:4pt 0">• '+inlineHtml(it.head||"—")+(o.m.trim()?esc(" ("+o.m.trim()+")"):"")+'</p>'); if(it.rest.trim()) h.push(listHtml(it.rest,"",12)); imgs(o.photos); });
+      M.ops.forEach((o,oi)=>{ const it=splitItem(o.t); h.push('<p style="margin:4pt 0">'+esc(D.opsNum?markFor(D.opsNum,oi+1):"•")+' '+inlineHtml(it.head||"—")+(o.m.trim()?esc(" ("+o.m.trim()+")"):"")+'</p>'); if(it.rest.trim()) h.push(listHtml(it.rest,"",12)); imgs(o.photos); });
       if(M.tests.length) h.push(tbl(TH_TEST,M.tests));
       if(D.constat.trim()){
         if(hasList(D.constat)) h.push('<p style="margin:8pt 0 2pt"><b>Constat :</b></p>'+listHtml(D.constat.trim()));
@@ -1011,9 +1025,9 @@
     }
     if(M.acts.length){
       h.push(H2("Actions de remise en état"));
-      M.acts.forEach(a=>{
+      M.acts.forEach((a,ai)=>{
         const it = splitItem(a.t);
-        h.push('<p style="margin:3pt 0">'+(a.done?'<span style="color:#1E8E4E;font-weight:bold">☑</span>':'☐')+' '+(inlineHtml(it.head)||"—")+'</p>');
+        h.push('<p style="margin:3pt 0">'+(a.done?'<span style="color:#1E8E4E;font-weight:bold">☑</span>':'☐')+' '+(D.actsNum?esc(markFor(D.actsNum,ai+1))+' ':'')+(inlineHtml(it.head)||"—")+'</p>');
         if(it.rest.trim()) h.push(listHtml(it.rest,"",12));
         imgs(a.photos);
       });
@@ -1085,7 +1099,7 @@
   }
   function wRich(t,o){
     o = o||{};
-    return parseInline(t).map(x=>wRun(x.t,Object.assign({},o,{b:x.b||o.b,i:x.i||o.i,color:x.c||o.color}))).join("");
+    return parseInline(t).map(x=>wRun(x.t,Object.assign({},o,{b:x.b||o.b,i:x.i||o.i,color:x.c||o.color,sz:x.z?Math.round((o.sz||21)*x.z):o.sz}))).join("");
   }
   function wCell(w,inner,o){
     o=o||{};
@@ -1157,7 +1171,7 @@
 
     if(M.ops.length || M.tests.length || D.constat.trim()){
       H2(M.ops.length?"Opérations réalisées":"Contrôles et constat");
-      M.ops.forEach(o=>{ const it=splitItem(o.t); body.push(wPara(wRun("• ")+wRich(it.head||"—")+(o.m.trim()?wRun(" ("+o.m.trim()+")"):""),{before:60,after:40})); if(it.rest.trim()) wList(it.rest,{ind:780,hang:320,after:40,plainInd:460}).forEach(x=>body.push(x)); photos(o.photos); });
+      M.ops.forEach((o,oi)=>{ const it=splitItem(o.t); body.push(wPara(wRun((D.opsNum?markFor(D.opsNum,oi+1):"•")+" ")+wRich(it.head||"—")+(o.m.trim()?wRun(" ("+o.m.trim()+")"):""),{before:60,after:40})); if(it.rest.trim()) wList(it.rest,{ind:780,hang:320,after:40,plainInd:460}).forEach(x=>body.push(x)); photos(o.photos); });
       if(M.tests.length) dataTable([1981,1981,1981,1981,1982],TH_TEST,M.tests);
       if(D.constat.trim()){
         if(hasList(D.constat)){ body.push(wPara(wRun("Constat :",{b:1}),{before:120,after:40,keepNext:1})); wList(D.constat.trim()).forEach(x=>body.push(x)); }
@@ -1179,7 +1193,7 @@
     }
     if(M.acts.length){
       H2("Actions de remise en état");
-      M.acts.forEach(a=>{ const it=splitItem(a.t); body.push(wPara(wRun(a.done?"☑":"☐",{font:"Segoe UI Symbol",b:a.done,color:a.done?"1E8E4E":undefined})+wRun(" ")+wRich(it.head||"—"),{after:50})); if(it.rest.trim()) wList(it.rest,{ind:780,hang:320,after:40,plainInd:460}).forEach(x=>body.push(x)); photos(a.photos); });
+      M.acts.forEach((a,ai)=>{ const it=splitItem(a.t); body.push(wPara(wRun(a.done?"☑":"☐",{font:"Segoe UI Symbol",b:a.done,color:a.done?"1E8E4E":undefined})+wRun(" "+(D.actsNum?markFor(D.actsNum,ai+1)+" ":""))+wRich(it.head||"—"),{after:50})); if(it.rest.trim()) wList(it.rest,{ind:780,hang:320,after:40,plainInd:460}).forEach(x=>body.push(x)); photos(a.photos); });
     }
     if(M.parts.length){ H2("Pièces remplacées"); dataTable([5600,2706,1600],TH_PART,M.parts); }
     H2("Conclusion");
@@ -1383,7 +1397,7 @@
   $("#numAuto").addEventListener("click",()=>{ D.numAuto=true; refreshNum(); changed(); toast("Numéro automatique"); });
   $("#addLieu").addEventListener("click",()=>{ D.lieux.push(""); renderLieux(); const i=$$("#lieux input"); i[i.length-1].focus(); });
   $("#addInterv").addEventListener("click",()=>{ D.intervs.push({n:"",m:""}); renderIntervs(); const i=$$("#intervs input.nm"); i[i.length-1].focus(); });
-  $("#addOp").addEventListener("click",()=>{ D.ops.push({t:"",m:"",photos:[]}); renderOps(); const i=$$("#ops .row input"); i[i.length-1].focus(); });
+  $("#addOp").addEventListener("click",()=>{ D.ops.push({t:"",m:"",photos:[]}); renderOps(); const i=$$("#ops textarea.mlt"); if(i.length) i[i.length-1].focus(); });
   $("#opsSw").addEventListener("click",()=>{ D.opsOn=!D.opsOn; setSw("#opsSw",D.opsOn,"#opsBox"); rerenderPhotos(); changed(); });
   $("#testSw").addEventListener("click",()=>{
     D.testOn = !D.testOn;
@@ -1391,7 +1405,7 @@
     renderTests(); setSw("#testSw",D.testOn,"#testBox"); changed();
   });
   $("#addTest").addEventListener("click",()=>{ D.tests.push({f:"",b:"Aucun",l:"Aucune",t:"",p:""}); renderTests(); changed(); });
-  $("#addAct").addEventListener("click",()=>{ D.acts.push({t:"",done:false,photos:[]}); renderActs(); const i=$$("#acts input[type=text]"); i[i.length-1].focus(); });
+  $("#addAct").addEventListener("click",()=>{ D.acts.push({t:"",done:false,photos:[]}); renderActs(); const i=$$("#acts textarea.mlt"); if(i.length) i[i.length-1].focus(); });
   $("#addPart").addEventListener("click",()=>{ D.parts.push({d:"",r:"",q:""}); renderParts(); changed(); });
   $("#saveRep").addEventListener("click",saveReport);
   $("#saveRep2").addEventListener("click",saveReport);
@@ -1418,6 +1432,7 @@
 
   /* ---------- Mise en forme : *gras*  _italique_  {rouge|texte} ---------- */
   const TCOL = {rouge:"D32F2F",orange:"D97706",vert:"1E8E4E",bleu:"1F5FBF"};
+  const TSZ = {petit:0.8,grand:1.35,tgrand:1.7};
   function parseInline(str){
     const out = [];
     const okBefore = (s,i)=> i===0 || /[\s(\[«"'{|]/.test(s[i-1]);
@@ -1429,29 +1444,29 @@
     function findBrace(s,from){
       let d=0;
       for(let j=from;j<s.length;j++){
-        if(s[j]==="{" && /^\{(?:rouge|orange|vert|bleu)\|/.test(s.slice(j))) d++;
+        if(s[j]==="{" && /^\{(?:rouge|orange|vert|bleu|petit|grand|tgrand)\|/.test(s.slice(j))) d++;
         else if(s[j]==="}"){ if(d===0) return j; d--; }
       }
       return -1;
     }
     function walk(s,st){
       let i=0, buf="";
-      const flush=()=>{ if(buf){ out.push({t:buf,b:st.b,i:st.i,c:st.c}); buf=""; } };
+      const flush=()=>{ if(buf){ out.push({t:buf,b:st.b,i:st.i,c:st.c,z:st.z}); buf=""; } };
       while(i<s.length){
         const ch = s[i];
         if(ch==="{"){
-          const m = /^\{(rouge|orange|vert|bleu)\|/.exec(s.slice(i));
-          if(m){ const e = findBrace(s,i+m[0].length); if(e>=0){ flush(); walk(s.slice(i+m[0].length,e),{b:st.b,i:st.i,c:TCOL[m[1]]}); i=e+1; continue; } }
+          const m = /^\{(rouge|orange|vert|bleu|petit|grand|tgrand)\|/.exec(s.slice(i));
+          if(m){ const e = findBrace(s,i+m[0].length); if(e>=0){ flush(); walk(s.slice(i+m[0].length,e),{b:st.b,i:st.i,c:TCOL[m[1]]||st.c,z:TSZ[m[1]]||st.z}); i=e+1; continue; } }
         }
         if((ch==="*"||ch==="_") && okBefore(s,i) && i+1<s.length && !/\s/.test(s[i+1])){
           const e = findMark(s,i,ch);
-          if(e>=0){ flush(); walk(s.slice(i+1,e),{b:ch==="*"||st.b,i:ch==="_"||st.i,c:st.c}); i=e+1; continue; }
+          if(e>=0){ flush(); walk(s.slice(i+1,e),{b:ch==="*"||st.b,i:ch==="_"||st.i,c:st.c,z:st.z}); i=e+1; continue; }
         }
         buf+=ch; i++;
       }
       flush();
     }
-    walk(String(str),{b:false,i:false,c:null});
+    walk(String(str),{b:false,i:false,c:null,z:0});
     return out;
   }
   const plain = t=>parseInline(t).map(x=>x.t).join("");
@@ -1461,6 +1476,7 @@
       if(x.b) h = "<b>"+h+"</b>";
       if(x.i) h = "<i>"+h+"</i>";
       if(x.c) h = '<span style="color:#'+x.c+'">'+h+"</span>";
+      if(x.z) h = '<span style="font-size:'+x.z+'em">'+h+"</span>";
       return h;
     }).join("");
   }
@@ -1506,15 +1522,25 @@
     let b = v.indexOf("\n",se); if(b<0) b=v.length;
     return [a,b];
   }
+  const numOf = m => m[3] ? parseInt(m[3],10) : (m[5] ? m[5].charCodeAt(0)-96 : ROMANS.indexOf(m[6])+1);
+  function lastNumInfo(arr,idx,lvl){
+    for(let i=idx-1;i>=0;i--){
+      const m = LIST_RE.exec(arr[i]); if(!m) continue;
+      const lv = lvlOf(m[1]);
+      if(lv<lvl) return {n:0,fam:null};
+      if(lv===lvl) return m[2] ? {n:0,fam:null} : {n:numOf(m),fam:famOf(m)};
+    }
+    return {n:0,fam:null};
+  }
   function renumberText(t){
     const cnt = [0,0,0,0,0];
     return t.split("\n").map(l=>{
       const m = LIST_RE.exec(l);
-      if(!m){ cnt.fill(0); return l; }
+      if(!m) return l;
       const lv = lvlOf(m[1]);
       for(let d=lv+1; d<5; d++) cnt[d]=0;
       if(m[2]){ cnt[lv]=0; return l; }
-      cnt[lv]++;
+      cnt[lv] = numOf(m)===1 ? 1 : cnt[lv]+1;
       return m[1]+markFor(famOf(m),cnt[lv])+" "+m[7];
     }).join("\n");
   }
@@ -1528,47 +1554,50 @@
   function applyList(ta,kind,style){
     const v = ta.value, collapsed = ta.selectionStart===ta.selectionEnd;
     const [a,b] = lineBounds(v,ta.selectionStart,ta.selectionEnd);
-    const sl = lineIdx(v,a), lines = v.slice(a,b).split("\n");
+    const sl = lineIdx(v,a), lines = v.slice(a,b).split("\n"), all = v.split("\n");
     const target = lines.map(l=>collapsed || l.trim());
     const ms = lines.map(l=>LIST_RE.exec(l));
     const same = i=>{ const m=ms[i]; if(!m) return false; return kind==="b" ? (!!m[2] && bulOf(m[2])===style) : (!m[2] && famOf(m)===style); };
-    const allOn = kind!=="x" && lines.every((l,i)=>!target[i] || same(i));
-    const first = {"d.":"1.","d)":"1)","l)":"a)","r.":"i."};
+    const allOn = (kind==="b" || kind==="n") && lines.every((l,i)=>!target[i] || same(i));
+    let n = 0, fam = style, started = false;
     const out = lines.map((l,i)=>{
       if(!target[i]) return l;
       const m = ms[i], lead = m ? m[1] : l.match(/^[ \t]*/)[0], body = m ? m[7] : l.trim();
       if(kind==="x" || allOn) return body;
-      return lead+(kind==="b" ? style : first[style])+" "+body;
+      if(kind==="b") return lead+style+" "+body;
+      if(kind==="c" && !started){ const inf = lastNumInfo(all,sl+i,lvlOf(lead)); n = inf.n; fam = inf.fam || "d."; started = true; }
+      n++;
+      return lead+markFor(fam,n)+" "+body;
     });
     putText(ta, v.slice(0,a)+out.join("\n")+v.slice(b), sl, sl+lines.length-1, collapsed);
   }
   function shiftList(ta,dir){
     const v = ta.value, collapsed = ta.selectionStart===ta.selectionEnd;
     const [a,b] = lineBounds(v,ta.selectionStart,ta.selectionEnd);
-    const sl = lineIdx(v,a), lines = v.slice(a,b).split("\n");
+    const sl = lineIdx(v,a), cntL = v.slice(a,b).split("\n").length, all = v.split("\n");
     let did = false;
-    const out = lines.map(l=>{
-      const m = LIST_RE.exec(l); if(!m) return l;
-      const lv = lvlOf(m[1]), nl = lv+dir; if(nl<0 || nl>4) return l;
+    for(let k=0;k<cntL;k++){
+      const i = sl+k, m = LIST_RE.exec(all[i]); if(!m) continue;
+      const lv = lvlOf(m[1]), nl = lv+dir; if(nl<0 || nl>4) continue;
       did = true; let mark;
       if(m[2]){ const g=bulOf(m[2]); mark = BCYC.indexOf(g)>=0 ? BCYC[nl%3] : g; }
-      else { const f=famOf(m); mark = (FCYC.indexOf(f)>=0 && FCYC[lv%3]===f) ? markFor(FCYC[nl%3],1) : markFor(f,1); }
-      return "  ".repeat(nl)+mark+" "+m[7];
-    });
+      else { const f=famOf(m), nf=(FCYC.indexOf(f)>=0 && FCYC[lv%3]===f) ? FCYC[nl%3] : f; mark = markFor(nf,lastNumInfo(all,i,nl).n+1); }
+      all[i] = "  ".repeat(nl)+mark+" "+m[7];
+    }
     if(!did){ toast(dir>0 ? "Place le curseur sur une ligne de liste pour la décaler" : "Cette ligne est déjà au niveau principal"); return; }
-    putText(ta, v.slice(0,a)+out.join("\n")+v.slice(b), sl, sl+lines.length-1, collapsed);
+    putText(ta, all.join("\n"), sl, sl+cntL-1, collapsed);
   }
   function continueList(ta){
     const v = ta.value, pos = ta.selectionStart;
     if(pos<1 || v[pos-1]!=="\n") return;
     const ps = v.lastIndexOf("\n",pos-2)+1, prev = v.slice(ps,pos-1);
-    const mE = EMPTY_RE.exec(prev), mL = LIST_RE.exec(prev), ci = lineIdx(v,pos);
+    const mE = EMPTY_RE.exec(prev), mL = LIST_RE.exec(prev), ci = lineIdx(v,pos), all = v.split("\n");
     if(mE){
       const lv = lvlOf(mE[1]);
       if(lv>0){
         const nl = lv-1; let mark;
         if(mE[2]){ const g=bulOf(mE[2]); mark = BCYC.indexOf(g)>=0 ? BCYC[nl%3] : g; }
-        else { const f=famOf(mE); mark = (FCYC.indexOf(f)>=0 && FCYC[lv%3]===f) ? markFor(FCYC[nl%3],1) : markFor(f,1); }
+        else { const f=famOf(mE), nf=(FCYC.indexOf(f)>=0 && FCYC[lv%3]===f) ? FCYC[nl%3] : f; mark = markFor(nf,lastNumInfo(all,ci-1,nl).n+1); }
         putText(ta, v.slice(0,ps)+"  ".repeat(nl)+mark+" "+v.slice(pos), ci-1, ci-1, true);
       } else {
         ta.value = v.slice(0,ps)+v.slice(pos); ta.setSelectionRange(ps,ps);
@@ -1577,7 +1606,7 @@
       return;
     }
     if(mL){
-      const mark = mL[2] ? bulOf(mL[2]) : markFor(famOf(mL),1);
+      const mark = mL[2] ? bulOf(mL[2]) : markFor(famOf(mL),numOf(mL)+1);
       putText(ta, v.slice(0,pos)+mL[1]+mark+" "+v.slice(pos), ci, ci, true);
     }
   }
@@ -1598,20 +1627,23 @@
     ta.value = nv; ta.focus(); ta.setSelectionRange(na,nb);
     ta.dispatchEvent(new Event("input",{bubbles:true}));
   }
-  function colorSel(ta,name){
+  function fmtSel(ta,name,group,what){
     const v = ta.value; let a = ta.selectionStart, b = ta.selectionEnd;
     while(a<b && /\s/.test(v[a])) a++;
     while(b>a && /\s/.test(v[b-1])) b--;
-    if(a>=b){ toast("Sélectionne d'abord le texte à colorer"); return; }
+    if(a>=b){ toast("Sélectionne d'abord le texte "+what); return; }
+    const alt = group.join("|");
     let sel = v.slice(a,b), pre = v.slice(0,a), post = v.slice(b);
-    const mb = /\{(rouge|orange|vert|bleu)\|$/.exec(pre);
+    const mb = new RegExp("\\{(?:"+alt+")\\|$").exec(pre);
     if(mb && post.startsWith("}")){ pre = pre.slice(0,pre.length-mb[0].length); post = post.slice(1); }
-    else { const mi = /^\{(rouge|orange|vert|bleu)\|([\s\S]*)\}$/.exec(sel); if(mi) sel = mi[2]; }
-    const nv = name==="aucune" ? pre+sel+post : pre+"{"+name+"|"+sel+"}"+post;
-    ta.value = nv; ta.focus();
-    const na = pre.length+(name==="aucune"?0:name.length+2); ta.setSelectionRange(na,na+sel.length);
+    else { const mi = new RegExp("^\\{(?:"+alt+")\\|([\\s\\S]*)\\}$").exec(sel); if(mi) sel = mi[1]; }
+    const none = name==="aucune" || name==="normal";
+    ta.value = none ? pre+sel+post : pre+"{"+name+"|"+sel+"}"+post; ta.focus();
+    const na = pre.length+(none?0:name.length+2); ta.setSelectionRange(na,na+sel.length);
     ta.dispatchEvent(new Event("input",{bubbles:true}));
   }
+  const colorSel = (ta,name)=>fmtSel(ta,name,["rouge","orange","vert","bleu"],"à colorer");
+  const sizeSel = (ta,name)=>fmtSel(ta,name,["petit","grand","tgrand"],"dont tu veux changer la taille");
   function attachListTools(ta,opt){
     if(!ta || ta.dataset.lt) return; ta.dataset.lt="1"; opt = opt||{};
     const mini = !!opt.mini;
@@ -1625,14 +1657,15 @@
       return sel;
     };
     const selBul = mkSel(mini?"•":"• Puces","Style de puces",[["•","• Puces"],["○","○ Cercles"],["▪","▪ Carrés"],["➤","➤ Flèches"],["✓","✓ Coches"],["–","– Tirets"],["x","✕ Retirer la liste"]],x=>applyList(ta,x==="x"?"x":"b",x));
-    const selNum = mkSel(mini?"1.":"1. Numéros","Style de numérotation",[["d.","1. 2. 3."],["d)","1) 2) 3)"],["l)","a) b) c)"],["r.","i. ii. iii."],["x","✕ Retirer la numérotation"]],x=>applyList(ta,x==="x"?"x":"n",x));
+    const selNum = mkSel(mini?"1.":"1. Numéros","Style de numérotation",[["d.","1. 2. 3."],["d)","1) 2) 3)"],["l)","a) b) c)"],["r.","i. ii. iii."],["c","↪ Continuer la numérotation"],["x","✕ Retirer la numérotation"]],x=>applyList(ta,x==="x"?"x":(x==="c"?"c":"n"),x));
+    const selSize = mkSel(mini?"A↕":"A↕ Taille","Taille du texte sélectionné",[["petit","Petit"],["normal","Normal"],["grand","Grand"],["tgrand","Très grand"]],x=>sizeSel(ta,x));
     const selCol = mkSel(mini?"🎨":"🎨 Couleur","Couleur du texte sélectionné",[["rouge","Rouge"],["orange","Orange"],["vert","Vert"],["bleu","Bleu"],["aucune","Sans couleur"]],x=>colorSel(ta,x));
     bar.append(selBul, selNum,
       mk("⇥","Décaler vers la droite (sous-niveau)",()=>shiftList(ta,1)),
       mk("⇤","Décaler vers la gauche",()=>shiftList(ta,-1)),
       mk("<b>G</b>","Gras (sélectionner le texte d'abord)",()=>wrapSel(ta,"*","*")),
       mk("<i>I</i>","Italique (sélectionner le texte d'abord)",()=>wrapSel(ta,"_","_")),
-      selCol);
+      selSize, selCol);
     if(opt.place) opt.place(bar); else (ta.closest("label")||ta).after(bar);
     ta.addEventListener("input",e=>{ if(e.inputType==="insertLineBreak" || e.inputType==="insertParagraph") continueList(ta); });
     ta.addEventListener("keydown",e=>{
@@ -1871,7 +1904,11 @@
     el.value = v; D[k] = v; if(k==="tag") refreshNum(); changed();
   }
 
+  const APP_VERSION = "2.0", APP_DATE = "11.11.2026";
+  $("#appVer").textContent = "v"+APP_VERSION;
+  $("#verInfo").textContent = "Version de l'application : "+APP_VERSION+" ("+APP_DATE+")";
   edInit(); $$("textarea[data-k]").forEach(attachListTools);
+  ["opsNum","actsNum"].forEach(k=>$('[data-k="'+k+'"]').addEventListener("change",refreshBadges));
 
   /* listes de suggestions */
   const dl = (id,vals)=>{ const d=document.createElement("datalist"); d.id=id; d.innerHTML=vals.map(x=>'<option value="'+esc(x)+'">').join(""); document.body.append(d); };
